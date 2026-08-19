@@ -1,0 +1,22 @@
+-- AlterTable
+ALTER TABLE "Part" ADD COLUMN "bends" INTEGER;
+ALTER TABLE "Part" ADD COLUMN "comparisonName" TEXT;
+ALTER TABLE "Part" ADD COLUMN "diameterInnerMm" REAL;
+ALTER TABLE "Part" ADD COLUMN "diameterOuterMm" REAL;
+ALTER TABLE "Part" ADD COLUMN "functionName" TEXT;
+ALTER TABLE "Part" ADD COLUMN "geometryType" TEXT;
+ALTER TABLE "Part" ADD COLUMN "isFastener" BOOLEAN;
+ALTER TABLE "Part" ADD COLUMN "makeOrBuy" TEXT;
+ALTER TABLE "Part" ADD COLUMN "moduleName" TEXT;
+ALTER TABLE "Part" ADD COLUMN "partNo" TEXT;
+ALTER TABLE "Part" ADD COLUMN "primaryProcess" TEXT;
+ALTER TABLE "Part" ADD COLUMN "productCategory" TEXT;
+ALTER TABLE "Part" ADD COLUMN "punches" INTEGER;
+ALTER TABLE "Part" ADD COLUMN "secondaryProcess" TEXT;
+ALTER TABLE "Part" ADD COLUMN "similarFlag" BOOLEAN;
+ALTER TABLE "Part" ADD COLUMN "surfaceFinish" TEXT;
+ALTER TABLE "Part" ADD COLUMN "thicknessMm" REAL;
+ALTER TABLE "Part" ADD COLUMN "turns" INTEGER;
+ALTER TABLE "Part" ADD COLUMN "unfoldedLengthMm" REAL;
+ALTER TABLE "Part" ADD COLUMN "unfoldedWidthMm" REAL;
+ALTER TABLE "Part" ADD COLUMN "uom" TEXT;

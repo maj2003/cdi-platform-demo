@@ -1,0 +1,241 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    /* Warning/rare-accent (Daikin salmon) — a distinct semantic from
+       destructive: destructive is for real errors (failed loads, invalid
+       input, delete); warning is the "pay attention" family (over-budget cost
+       deltas today). Keeping them separate stops the one rare accent color
+       from being diluted into an everyday error color. */
+    --color-warning-foreground: var(--warning-foreground);
+    --color-warning: var(--warning);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    /* The persistent header/nav chrome — deliberately NOT part of the
+       :root/.dark split below (declared once, inherited by both) because it's
+       a fixed brand element, not a themeable surface. See the header rule in
+       App.jsx. */
+    --color-header-foreground: var(--header-foreground);
+    --color-header-background: var(--header-background);
+    --color-header-accent: var(--header-accent);
+    /* CDI brand tokens. --primary IS the CDI electric blue (below), so these
+       are the roles primary cannot fill: the deep navy chrome, the violet the
+       mark ends on, and Daikin blue in its new role as the SUPPORTING brand. */
+    --color-cdi-navy: var(--cdi-navy);
+    --color-cdi-blue: var(--cdi-blue);
+    --color-cdi-violet: var(--cdi-violet);
+    --color-daikin: var(--daikin);
+    --color-daikin-foreground: var(--daikin-foreground);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    /* ---------------------------------------------------------------------
+       Daikin brand palette. Surfaces are two tiers on purpose — #F4F6F9 page
+       canvas behind pure-white cards — so a bordered white card reads as a
+       distinct object against the page rather than blending into it. That is
+       what makes "white cards with subtle borders" work; a single flat white
+       background behind white cards would need heavier shadows to separate
+       them, which is exactly the "AI-generated dashboard" look this is
+       avoiding.
+    --------------------------------------------------------------------- */
+    --background: oklch(0.972 0.005 258.325); /* #F4F6F9 */
+    --foreground: oklch(0.244 0.006 0.594); /* #231F20 ink */
+    --card: oklch(1 0 0); /* white */
+    --card-foreground: oklch(0.244 0.006 0.594);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.244 0.006 0.594);
+    /* ---------------------------------------------------------------------
+       THE BRAND IS NOW TWO BRANDS, AND THE TOKENS SAY WHICH IS WHICH.
+
+       CDI is the PLATFORM; Daikin is the CLIENT it is running for — Power BI
+       inside Microsoft, not Power BI replacing Microsoft. So:
+
+         --cdi-navy    deep navy. Chrome, headings, the header bar. The colour
+                       that makes this read as an executive intelligence
+                       platform rather than a dashboard.
+         --cdi-blue    electric blue. THE primary action colour — this is what
+                       --primary now resolves to.
+         --cdi-violet  the violet the mark's play triangle ends on. Used only
+                       in brand gradients, never as a UI state, so it stays a
+                       signature rather than becoming a third accent.
+         --daikin      Daikin cerulean, unchanged in value and demoted in role:
+                       from "the primary" to "the supporting brand", used for
+                       the secondary action variant and Daikin attribution.
+
+       --accent (Maya light blue) keeps its job unchanged: the ambient
+       hover/active/selected tint and the focus ring. It is Daikin-derived and
+       stays, which is what keeps Daikin's visual identity present throughout
+       rather than reduced to a line of small print.
+
+       Still no fourth bright colour: every accent use is one of these named
+       roles (see PROGRESS.md's key decisions).
+       --------------------------------------------------------------------- */
+    --cdi-navy: oklch(0.244 0.062 268);      /* #141C3A */
+    --cdi-blue: oklch(0.577 0.192 262.5);    /* #2E7BF6 */
+    --cdi-violet: oklch(0.514 0.244 292);    /* #7B3FE4 */
+    --daikin: oklch(0.67 0.148 237.644);     /* #00A0E4 cerulean */
+    --daikin-foreground: oklch(0.985 0 0);
+
+    --primary: var(--cdi-blue);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.94 0.008 258);
+    --secondary-foreground: oklch(0.244 0.006 0.594);
+    --muted: oklch(0.95 0.006 258);
+    --muted-foreground: oklch(0.53 0.012 255);
+    /* Light enough that it needs ink, not white, text on top — see button.jsx
+       hover states and ProductSubNav.jsx's active tab for where this lands. */
+    --accent: oklch(0.78 0.128 225.152); /* #44C8F5 Maya light blue */
+    --accent-foreground: oklch(0.244 0.006 0.594);
+    /* Real errors (failed loads, invalid input, delete) — unchanged, a
+       standard red, distinct from the salmon warning accent below. */
+    --destructive: oklch(0.577 0.245 27.325);
+    /* Daikin salmon — reserved for the warning/"over-budget" signal family
+       ONLY (see ComparePage.jsx's deltaClass). Not a general-purpose second
+       accent: using it decoratively anywhere else defeats the point of it
+       being rare. */
+    --warning: oklch(0.754 0.15 35.28); /* #FF896B */
+    --warning-foreground: oklch(0.244 0.006 0.594);
+    --border: oklch(0.9 0.006 258);
+    --input: oklch(0.9 0.006 258);
+    /* Light-blue focus rings, not neutral grey — one more place the ambient
+       accent shows up ("light highlight fills"). */
+    --ring: oklch(0.78 0.128 225.152);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    /* CDI deep navy — the fixed header/nav chrome. Declared only here, never
+       overridden in .dark below, because it is a constant brand element, not a
+       themeable surface: the header stays navy whether the rest of the app is
+       in light or dark mode.
+
+       It was Daikin cerulean. A full-width bright-blue bar is what made the app
+       read as a departmental tool; navy is what makes it read as a platform, and
+       it is also the only chrome the CDI mark sits on correctly. Daikin's blue
+       is not lost — --header-accent below is still Maya light blue, so the
+       header's own active/hover moment remains a Daikin colour. */
+    --header-background: var(--cdi-navy);
+    --header-foreground: oklch(0.985 0 0);
+    --header-accent: oklch(0.78 0.128 225.152); /* #44C8F5 Daikin Maya light blue */
+    --sidebar: var(--cdi-navy);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: var(--cdi-navy);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.78 0.128 225.152);
+    --sidebar-accent-foreground: oklch(0.244 0.006 0.594);
+    --sidebar-border: oklch(1 0 0 / 12%);
+    --sidebar-ring: oklch(0.78 0.128 225.152);
+}
+
+.dark {
+    /* Brand constants, restated so var(--cdi-*) resolves in this scope. Same
+       hex values: a brand colour does not change with the OS theme. Only the
+       ROLE mapping differs — see --primary below. */
+    --cdi-navy: oklch(0.244 0.062 268);
+    --cdi-blue: oklch(0.577 0.192 262.5);
+    --cdi-violet: oklch(0.514 0.244 292);
+    --daikin: oklch(0.67 0.148 237.644);
+    --daikin-foreground: oklch(0.985 0 0);
+    /* Dark surfaces get a faint blue tint (chroma 0.014 at hue 240 — barely
+       perceptible) rather than pure neutral grey, so dark mode still reads as
+       "this app" rather than a generic shadcn dark theme. --header-background
+       is intentionally NOT redefined here — see its declaration in :root. */
+    --background: oklch(0.16 0.014 240);
+    --foreground: oklch(0.97 0 0);
+    --card: oklch(0.22 0.014 240);
+    --card-foreground: oklch(0.97 0 0);
+    --popover: oklch(0.22 0.014 240);
+    --popover-foreground: oklch(0.97 0 0);
+    /* In dark mode, --primary and --accent converge on the same Maya light
+       blue: the reason they're split in light mode (cerulean for white text,
+       light blue for ink text) is a light-mode contrast problem, and it
+       doesn't apply here — a light button needs dark text regardless of
+       which theme the page around it is in. So the "solid CTA" role just
+       becomes the same light, ink-texted color as the ambient accent. */
+    --primary: oklch(0.78 0.128 225.152); /* #44C8F5 */
+    --primary-foreground: oklch(0.244 0.006 0.594);
+    --secondary: oklch(0.27 0.014 240);
+    --secondary-foreground: oklch(0.97 0 0);
+    --muted: oklch(0.27 0.014 240);
+    --muted-foreground: oklch(0.72 0.01 240);
+    --accent: oklch(0.78 0.128 225.152);
+    --accent-foreground: oklch(0.244 0.006 0.594);
+    --destructive: oklch(0.704 0.191 22.216);
+    /* Salmon stays the same value in dark mode — it's already light-toned
+       (L=0.75), so it doesn't need the same "lighten for dark bg" treatment
+       primary needs. */
+    --warning: oklch(0.754 0.15 35.28);
+    --warning-foreground: oklch(0.18 0.02 240);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.78 0.128 225.152);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.16 0.014 240);
+    --sidebar-foreground: oklch(0.97 0 0);
+    --sidebar-primary: oklch(0.78 0.128 225.152);
+    --sidebar-primary-foreground: oklch(0.244 0.006 0.594);
+    --sidebar-accent: oklch(0.27 0.014 240);
+    --sidebar-accent-foreground: oklch(0.97 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.78 0.128 225.152);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}

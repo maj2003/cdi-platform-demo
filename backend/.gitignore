@@ -1,0 +1,15 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+/generated/prisma
+
+dev.db
+*.db
+*.db-journal
+
+# Real competitor CEDARS BOM exports used to verify the importer. Ignored
+# deliberately: PROGRESS.md's environment rule for this machine is dummy data
+# only — these files are inputs for a local verification run, not repo content.
+/fixtures/cedars/*.xlsx
+/fixtures/cedars/*.xls

@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "Part" ADD COLUMN "commodity" TEXT;
+ALTER TABLE "Part" ADD COLUMN "description" TEXT;
+ALTER TABLE "Part" ADD COLUMN "fpi" INTEGER;
+ALTER TABLE "Part" ADD COLUMN "imageUrl" TEXT;
+ALTER TABLE "Part" ADD COLUMN "scrapRatePct" REAL;
+ALTER TABLE "Part" ADD COLUMN "wallThicknessMm" REAL;
+ALTER TABLE "Part" ADD COLUMN "weightLbs" REAL;
+ALTER TABLE "Part" ADD COLUMN "wireGauge" TEXT;

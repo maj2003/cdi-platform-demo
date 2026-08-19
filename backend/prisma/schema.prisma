@@ -1,0 +1,386 @@
+// ---------------------------------------------------------------------------
+// Daikin Benchmarking MVP — data model
+//
+// PORTABILITY NOTE (this is the whole point of the file):
+// The only cloud-coupled line in here is `provider` below. When this moves to
+// the work laptop, `provider = "sqlserver"` (Azure SQL) + a new DATABASE_URL is
+// the entire migration surface — plus the two type upgrades flagged inline
+// (`persona`/`type` -> enum, `payload` -> Json). No application code changes,
+// because nothing outside src/data/ knows Prisma exists.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite for the pre-integration build: a single local file, zero services,
+  // zero credentials. Swap to "sqlserver" / "postgresql" later.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Product — the competitor unit that gets torn down.
+// ---------------------------------------------------------------------------
+model Product {
+  id       Int     @id @default(autoincrement())
+  name     String
+  brand    String
+  category String
+  notes    String?
+
+  // Where this product came from: "seed" | "import" | "manual". String, not enum
+  // — SQLite has none (same limitation as Part.geometryType), validated in
+  // productRepository.js instead.
+  //
+  // WHY THIS IS A COLUMN AND NOT DERIVED FROM `notes`. Provenance was previously
+  // readable only by string-matching the notes prose ("ILLUSTRATIVE DATA…" vs
+  // "Imported from…"), which meant illustrative and real competitor figures looked
+  // IDENTICAL on the repository page — someone could screenshot a fabricated cost
+  // as competitive intelligence. That is a credibility problem, not a cosmetic
+  // one, so it gets a real queryable field that survives an edited note.
+  //
+  // Defaults to "manual": anything created through the app's own authoring form is
+  // manual, and that is also the safest answer for a pre-existing row, since
+  // claiming unknown data is seeded (and therefore fake) or imported (and
+  // therefore real) would both be assertions this column cannot support.
+  source String @default("manual")
+
+  subAssemblies SubAssembly[]
+  reports       Report[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Two teardowns of the same brand+model would be a data-entry mistake, not a
+  // real case, so this doubles as the guard that makes the seed re-runnable.
+  @@unique([brand, name])
+}
+
+// ---------------------------------------------------------------------------
+// SubAssembly — a functional group within a product (e.g. "Fan Assembly").
+// ---------------------------------------------------------------------------
+model SubAssembly {
+  id          Int     @id @default(autoincrement())
+  productId   Int
+  name        String
+  description String?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  parts   Part[]
+
+  // Every teardown read starts with "give me the tree for product X", so the FK
+  // is indexed. Prisma does not create FK indexes automatically on SQLite.
+  @@index([productId])
+}
+
+// ---------------------------------------------------------------------------
+// Part — the atomic unit that carries weight, dimensions, material and cost.
+// ---------------------------------------------------------------------------
+model Part {
+  id            Int    @id @default(autoincrement())
+  subAssemblyId Int
+  name          String
+
+  material String?
+  finish   String?
+
+  // Units are baked into the column names on purpose. A float called `weight`
+  // is the classic source of a silent grams-vs-kilograms bug in a rollup; a
+  // float called `weightG` is not.
+  weightG Float?
+
+  // Dimensions are three scalar columns rather than one nested object. SQLite
+  // has no JSON type, and flat columns mean SUM/AVG/ORDER BY work directly in
+  // SQL — which is what Snowflake will want later anyway.
+  lengthMm    Float?
+  widthMm     Float?
+  heightMm    Float?
+  thicknessMm Float?
+
+  quantity Int @default(1)
+
+  // ---------------------------------------------------------------------
+  // BOM template metadata — the columns a real teardown BOM carries beyond
+  // the MVP's core fields. All optional: existing rows, and any insert that
+  // doesn't set them, stay valid. makeOrBuy is "Make" | "Buy", enforced in
+  // code rather than the DB — same reasoning as Measurement.type below.
+  // ---------------------------------------------------------------------
+  makeOrBuy        String?
+  moduleName       String?
+  productCategory  String?
+  partNo           String?
+  uom              String?
+  primaryProcess   String?
+  secondaryProcess String?
+  surfaceFinish    String?
+
+  // Where this part sits in the assembly hierarchy ("Level 0" .. "Level 4").
+  // Distinct from moduleName, which says WHICH assembly; this says how deep. Free
+  // text rather than an Int because the reference teardown sheets write it as a
+  // label ("Level 2"), and because a part can legitimately be recorded as "Sub-
+  // assembly" or "Component" where no numeric depth was agreed.
+  assemblyLevel    String?
+
+  // geometryType selects which of the geometry-specific dimension groups
+  // below is meaningful for this part — a rectangular bracket has no
+  // diameter, a coil has no unfolded length. String, not enum: SQLite has no
+  // enum support (same limitation as Measurement.type / Report.persona),
+  // validated in partRepository.js instead of the DB.
+  // Allowed: "rectangular" | "circular" | "sheet_metal" | "custom"
+  geometryType String?
+
+  // Circular geometry (motors, coils, barrels, probes).
+  diameterOuterMm Float?
+  diameterInnerMm Float?
+  turns           Int?
+
+  // ---------------------------------------------------------------------
+  // Sheet-metal finish, recorded per FACE.
+  //
+  // A formed panel is painted differently inside and out — an external powder
+  // coat over an internal primer is the normal case — and the two coatings have
+  // different thicknesses and different costs. One "paint thickness" column
+  // forced a choice between recording the outside or the inside, so the review
+  // asked for both, external first.
+  //
+  // These are deliberately NOT the existing `surfaceFinish` / `finish` columns.
+  // Those two already carry the CEDARS import's Exterior/Interior Finish and are
+  // read by the BOM export and the part-information editor; overloading them would
+  // make one field mean "Finishing Process" on one screen and "External Finish" on
+  // another. Kept separate and additive — see PROGRESS.md for the consolidation
+  // question that leaves open.
+  // ---------------------------------------------------------------------
+  // DEPRECATED, superseded by externalPaintThicknessMm below. Retained rather
+  // than dropped because dropping a column on SQLite means a destructive table
+  // redefine, and this one existed for a single commit and never held real data.
+  // Safe to remove in a future consolidation — see the TODO.
+  paintThicknessMm Float?
+
+  externalFinish           String?
+  externalPaintThicknessMm Float?
+  internalFinish           String?
+  internalPaintThicknessMm Float?
+
+  // Sheet-metal geometry (chassis, covers, brackets formed from flat stock).
+  // "Unfolded" = the flat-pattern dimensions before bending, which is what a
+  // stamping/bending cost actually scales with, not the folded envelope.
+  unfoldedLengthMm Float?
+  unfoldedWidthMm  Float?
+  bends            Int?
+  punches          Int?
+
+  // ---------------------------------------------------------------------
+  // Benchmarking metadata — how this part is named/grouped when comparing
+  // across competitor teardowns, independent of what this one product's
+  // engineers happened to call it.
+  // ---------------------------------------------------------------------
+  functionName   String?
+  comparisonName String?
+  isFastener     Boolean?
+  similarFlag    Boolean?
+
+  // ---------------------------------------------------------------------
+  // CEDARS import fields — see CEDARS_BOM_Import_Spec.md. Every one of these
+  // is a column the real CEDARS exports carry that had nowhere to land.
+  // ---------------------------------------------------------------------
+
+  // The source sheet's commodity (Steel | Tubing | Coil | Electrical | Wire |
+  // Fasteners | Insulation | Packaging | Labels | Misc). Deliberately stored
+  // ALONGSIDE the module rather than derived from it: several commodities
+  // collapse into one module (Fasteners, Insulation and Misc all land in
+  // Cabinet/Enclosure), so module cannot be reversed back into commodity.
+  // Spec §2 wants cost/weight pivotable by both.
+  commodity String?
+
+  // `Part Description` from the source. Distinct from `name`: name is the
+  // cleaned Component Name with its commodity prefix stripped, description is
+  // the file's own free-text detail.
+  description String?
+
+  // `Wall Thickness`. A real column rather than spec §3's suggested
+  // "diameterInnerMm proxy" — overloading diameterInnerMm would make a wall
+  // thickness read as a bore diameter in the geometry editor and in every
+  // export, which is a silent wrong answer rather than a missing one.
+  wallThicknessMm Float?
+
+  // Commodity-specific attributes, each meaningful on only some sheets.
+  fpi          Int? // fins per inch — Evaporator Coil
+  wireGauge    String? // AWG — Wire
+  scrapRatePct Float? // Steel / Evaporator Coil
+
+  // `Picture` — a cedars URL in the real files. Part had no image column;
+  // Measurement.imageUrl is the capture-event photo, a different thing.
+  imageUrl String?
+
+  // The source weight, unconverted. weightG stays canonical (every rollup and
+  // report already reads it); this preserves what the file actually said so an
+  // lbs display isn't a round-trip through a conversion, which is what spec §5
+  // asks for. Same reasoning as keeping Measurement alongside Part: the
+  // observed value and the resolved value are different facts.
+  weightLbs Float?
+
+  // ---------------------------------------------------------------------
+  // Picture UI (PUI) — the teardown photo label written on the physical part
+  // ("C1", "FJ1", "CAB-001"). Photos are captured and grouped by this ID
+  // during teardown, and the BOM creator types it here to pull them in.
+  //
+  // WHY THIS IS A REAL COLUMN while the images are not: the ID is the LINKAGE
+  // KEY and it is BOM metadata, in the same family as partNo. It has to
+  // survive a browser change, travel with the record, and eventually let a
+  // shared photo store be queried by it. The image bytes are browser-local for
+  // this build (frontend/src/lib/puiStore.js) precisely because their real home
+  // is SharePoint/Blob, which this build deliberately doesn't talk to.
+  //
+  // Deliberately NOT unique: two parts can legitimately share one photo label
+  // (a left and right panel photographed together), and the workflow depends on
+  // entering the same ID on both to surface the same photo set.
+  photoId String?
+
+  subAssembly  SubAssembly   @relation(fields: [subAssemblyId], references: [id], onDelete: Cascade)
+  measurements Measurement[]
+  costs        Cost[]
+  photoLabels  PhotoLabel[]
+
+  @@index([subAssemblyId])
+}
+
+// ---------------------------------------------------------------------------
+// Measurement — the raw capture event, kept separate from Part on purpose.
+//
+// Part holds the *current agreed* value; Measurement holds *what was actually
+// observed, when, and by whom*. Yuvaraj's hardware will eventually write here
+// many times per part, so this table is append-only history and Part is the
+// resolved view. Collapsing the two would throw away provenance.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// A photo label written on a physical part during teardown — one row per label.
+//
+// WHY A TABLE AND NOT JUST Part.photoId
+//
+// A part is photographed from several angles, and the teardown engineers label
+// each SHOT, not the part: "FJ0010" is the top view, "FJ0011" the front, "FJ0013"
+// the left, and so on. One part therefore owns a FAMILY of labels — roughly seven
+// per part across a hundred parts in the reference workflow — and a single string
+// column cannot hold that.
+//
+// Part.photoId is KEPT as the family's lead label (position 0). That is not
+// redundancy for its own sake: the Engineering BOM View has a Photo ID column and
+// a "Missing Photo ID" filter that both read it, and every teardown export quotes
+// it. Deriving those from this table on every read would mean a join on a screen
+// that renders 124 rows, to display one label out of seven. The lead label is
+// maintained by photoLabelRepository whenever the family changes, so the two
+// cannot drift.
+//
+// The IMAGES stay in the browser (frontend/src/lib/puiStore.js, keyed by label).
+// This table is the linkage and the allocation ledger — the part of the workflow
+// that has to survive a change of machine and let the next label be handed out
+// without two engineers being given the same one.
+// ---------------------------------------------------------------------------
+model PhotoLabel {
+  id     Int @id @default(autoincrement())
+  partId Int
+
+  // The text written on the part and printed on its label ("FJ0010"). Stored
+  // trimmed and upper-cased, the same normalisation Part.photoId goes through, so
+  // a label saved as "fj0010" and a photo stored under "FJ0010" always meet.
+  label String
+
+  // Which face this shot is of: "Top" | "Front" | "Left" | "Right" | "Rear" |
+  // "ISO" | "Detail". Nullable because a label can be allocated and printed
+  // BEFORE anyone decides which face it will be used for — which is the order the
+  // work actually happens in at the bench.
+  view String?
+
+  // Order within the part's family. 0 is the lead label mirrored onto
+  // Part.photoId. Explicit rather than relying on id, so labels can be reordered
+  // without renumbering rows.
+  position Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  part Part @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  // A part cannot carry the same label twice. NOT globally unique: two parts
+  // photographed together in one shot legitimately share a label, which is the
+  // same allowance Part.photoId has always made.
+  @@unique([partId, label])
+  @@index([partId])
+  @@index([label])
+}
+
+model Measurement {
+  id     Int @id @default(autoincrement())
+  partId Int
+
+  // String, not enum: Prisma has no native enum support on SQLite. The allowed
+  // values are enforced in src/data/measurementRepository.js instead, so the
+  // constraint lives in exactly one place and survives the DB swap.
+  // Allowed: "dimension_length" | "dimension_width" | "dimension_height" |
+  // "dimension_thickness" | "dimension_diameter" | "unfolded_length" |
+  // "unfolded_width" | "weight"
+  //
+  // The last four were added with the BOM Capture workstation. Every dimension the
+  // workstation captures now leaves a Measurement row, so a thickness read off a
+  // micrometer carries the same provenance — who, when, which instrument — that
+  // length and weight already did. Before, thickness could only be typed straight
+  // onto the Part, which made an instrument reading indistinguishable from a guess.
+  type String
+
+  value Float
+  unit  String // "mm" | "g"
+
+  capturedAt DateTime @default(now())
+  capturedBy String
+  imageUrl   String? // local path for the MVP; blob URL later
+
+  part Part @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  @@index([partId])
+  @@index([partId, type])
+}
+
+// ---------------------------------------------------------------------------
+// Cost — one cost record per part, split into the three buckets the Cost
+// Engineer persona reports on. Deliberately simple arithmetic only.
+// ---------------------------------------------------------------------------
+model Cost {
+  id     Int @id @default(autoincrement())
+  partId Int
+
+  materialCost Float  @default(0)
+  processCost  Float  @default(0)
+  labourCost   Float  @default(0)
+  currency     String @default("USD")
+
+  part Part @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  // One cost row per part for the MVP. This makes the repository's upsert
+  // unambiguous — re-running the seed updates rather than duplicating.
+  @@unique([partId])
+}
+
+// ---------------------------------------------------------------------------
+// Report — a persisted snapshot of a computed persona view.
+// ---------------------------------------------------------------------------
+model Report {
+  id        Int @id @default(autoincrement())
+  productId Int
+
+  // String, not enum — same SQLite reason as Measurement.type.
+  // Allowed: "cost_engineer" | "design_engineer" | "executive"
+  persona String
+
+  generatedAt DateTime @default(now())
+
+  // JSON-encoded string, because SQLite has no Json column type. The
+  // stringify/parse happens inside reportRepository so no service or route ever
+  // touches a raw string — when this becomes a real Json column on Azure SQL,
+  // only those two lines in the repository change.
+  payload String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, persona])
+}
